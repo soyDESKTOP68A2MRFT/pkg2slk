@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Verificar dependencias
+command -v tar >/dev/null 2>&1 || { echo "Error: 'tar' no está instalado."; exit 1; }
+command -v zstd >/dev/null 2>&1 || { echo "Error: 'zstd' no está instalado."; exit 1; }
+command -v makepkg >/dev/null 2>&1 || { echo "Error: 'makepkg' no está instalado."; exit 1; }
+
+# Verificar argumentos
+if [ $# -ne 1 ]; then
+    echo "Uso: $0 <paquete.pkg.tar.zst>"
+    exit 1
+fi
+
+# Variables
+INPUT_PACKAGE="$1"
+PACKAGE_NAME=$(basename "$INPUT_PACKAGE" .pkg.tar.zst)
+WORK_DIR="/tmp/pkg2slk_$PACKAGE_NAME"
+OUTPUT_PACKAGE="$PACKAGE_NAME.txz"
+OUTPUT_DIR="/home/joni/"
+
+# Verificar si el archivo existe y es un paquete válido
+if [[ ! -f "$INPUT_PACKAGE" || "${INPUT_PACKAGE##*.}" != "zst" ]]; then
+    echo "Error: El archivo especificado no es un paquete .pkg.tar.zst válido."
+    exit 1
+fi
+
+# Crear directorio de trabajo
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR" || exit
+
+# Extraer contenido del paquete de Arch Linux
+echo "Extrayendo contenido de $INPUT_PACKAGE..."
+tar --use-compress-program=unzstd -xvf "$INPUT_PACKAGE" || {
+    echo "Error: No se pudo extraer el paquete."
+    cd /
+    exit 1
+}
+
+# Crear estructura del paquete de Slackware si es necesario
+if [ ! -d "install" ]; then
+    mkdir install
+    echo "Generando archivo slack-desc..."
+    cat > install/slack-desc <<EOF
+# HOW TO EDIT THIS FILE:
+# See "man slack-desc" for details and guidelines.
+
+$PACKAGE_NAME: $PACKAGE_NAME (convertido desde Arch Linux)
+$PACKAGE_NAME:
+$PACKAGE_NAME: Este paquete fue convertido usando pkg2slk.
+$PACKAGE_NAME:
+$PACKAGE_NAME: ---
+$PACKAGE_NAME:
+EOF
+fi
+
+# Crear el paquete de Slackware (.txz)
+echo "Creando el paquete de Slackware: $OUTPUT_PACKAGE..."
+makepkg -l y -c n "../$OUTPUT_PACKAGE" || {
+    echo "Error: No se pudo crear el paquete de Slackware."
+    cd /
+    exit 1
+}
+
+# Mover el paquete a /home/joni
+mv "/tmp/$OUTPUT_PACKAGE" "$OUTPUT_DIR"
+
+# Limpiar directorio de trabajo
+cd /
+rm -rf "$WORK_DIR"
+
+echo "Conversión completada. Tu paquete está en el directorio /home/joni."
+echo "Paquete: $OUTPUT_DIR$OUTPUT_PACKAGE"
