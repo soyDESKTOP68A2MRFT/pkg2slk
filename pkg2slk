@@ -16,7 +16,7 @@ INPUT_PACKAGE="$1"
 PACKAGE_NAME=$(basename "$INPUT_PACKAGE" .pkg.tar.zst)
 WORK_DIR="/tmp/pkg2slk_$PACKAGE_NAME"
 OUTPUT_PACKAGE="$PACKAGE_NAME.txz"
-OUTPUT_DIR="/home/USER/"
+OUTPUT_DIR="/home/$(whoami)/"
 
 # Verificar si el archivo existe y es un paquete válido
 if [[ ! -f "$INPUT_PACKAGE" || "${INPUT_PACKAGE##*.}" != "zst" ]]; then
@@ -61,12 +61,12 @@ makepkg -l y -c n "../$OUTPUT_PACKAGE" || {
     exit 1
 }
 
-# Mover el paquete a /home/"YOUR USER"
+# Mover el paquete a /home/USER
 mv "/tmp/$OUTPUT_PACKAGE" "$OUTPUT_DIR"
 
 # Limpiar directorio de trabajo
 cd /
 rm -rf "$WORK_DIR"
 
-echo "Conversión completada. Tu paquete está en el directorio /home/joni."
+echo "Conversión completada. Tu paquete está en el directorio /home/USER."
 echo "Paquete: $OUTPUT_DIR$OUTPUT_PACKAGE"
