@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Verifica que se proporcione un término de búsqueda
+if [ -z "$1" ]; then
+    echo "Uso: $0 <término_de_búsqueda>"
+    exit 1
+fi
+
+# Término de búsqueda
+termino="$1"
+
+# Realiza la búsqueda en el AUR utilizando la API de AUR
+echo "Buscando paquetes en AUR que coincidan con: '$termino'..."
+resultado=$(curl -s "https://aur.archlinux.org/rpc/?v=5&type=search&arg=$termino")
+
+# Verifica si la búsqueda fue exitosa
+if [ -z "$resultado" ]; then
+    echo "No se pudo conectar al AUR. Verifica tu conexión a internet."
+    exit 1
+fi
+
+# Procesa y muestra los resultados
+paquetes=$(echo "$resultado" | jq -r '.results[] | "\(.Name) - \(.Description)"')
+
+if [ -z "$paquetes" ]; then
+    echo "No se encontraron paquetes que coincidan con '$termino'."
+else
+    echo "Resultados:"
+    echo "$paquetes"
+fi

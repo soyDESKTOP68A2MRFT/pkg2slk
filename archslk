@@ -1,0 +1,169 @@
+#!/bin/bash
+
+# Verificar dependencias
+for cmd in tar zstd makepkg curl; do
+    command -v $cmd >/dev/null 2>&1 || { echo "Error: '$cmd' no está instalado."; exit 1; }
+done
+
+# Función para convertir paquete de Arch Linux a Slackware
+convert_package() {
+    # Verificar argumentos
+    if [ -z "$1" ]; then
+        echo "Uso: $0 convertir <paquete.pkg.tar.zst>"
+        exit 1
+    fi
+
+    # Variables
+    INPUT_PACKAGE="$1"
+    PACKAGE_NAME=$(basename "$INPUT_PACKAGE" .pkg.tar.zst)
+    WORK_DIR="/tmp/pkg2slk_$PACKAGE_NAME"
+    OUTPUT_PACKAGE="$PACKAGE_NAME.txz"
+    OUTPUT_DIR="/home/$(whoami)/"
+
+    # Verificar si el archivo existe y es un paquete válido
+    if [[ ! -f "$INPUT_PACKAGE" || "${INPUT_PACKAGE##*.}" != "zst" ]]; then
+        echo "Error: El archivo especificado no es un paquete .pkg.tar.zst válido."
+        exit 1
+    fi
+
+    # Crear directorio de trabajo
+    mkdir -p "$WORK_DIR"
+    cd "$WORK_DIR" || exit
+
+    # Extraer contenido del paquete de Arch Linux
+    echo "Extrayendo contenido de $INPUT_PACKAGE..."
+    tar --use-compress-program=unzstd -xvf "$INPUT_PACKAGE" || {
+        echo "Error: No se pudo extraer el paquete."
+        cd /
+        exit 1
+    }
+
+    # Crear estructura del paquete de Slackware si es necesario
+    if [ ! -d "install" ]; then
+        mkdir install
+        echo "Generando archivo slack-desc..."
+        cat > install/slack-desc <<EOF
+# HOW TO EDIT THIS FILE:
+# See "man slack-desc" for details and guidelines.
+
+$PACKAGE_NAME: $PACKAGE_NAME (convertido desde Arch Linux)
+$PACKAGE_NAME:
+$PACKAGE_NAME: Este paquete fue convertido usando pkg2slk.
+$PACKAGE_NAME:
+$PACKAGE_NAME: ---
+$PACKAGE_NAME:
+EOF
+    fi
+
+    # Crear el paquete de Slackware (.txz)
+    echo "Creando el paquete de Slackware: $OUTPUT_PACKAGE..."
+    makepkg -l y -c n "../$OUTPUT_PACKAGE" || {
+        echo "Error: No se pudo crear el paquete de Slackware."
+        cd /
+        exit 1
+    }
+
+    # Mover el paquete a /home/joni
+    mv "/tmp/$OUTPUT_PACKAGE" "$OUTPUT_DIR"
+
+    # Limpiar directorio de trabajo
+    cd /
+    rm -rf "$WORK_DIR"
+
+    echo "Conversión completada. Tu paquete está en el directorio $OUTPUT_DIR."
+    echo "Paquete: $OUTPUT_DIR$OUTPUT_PACKAGE"
+}
+
+# Función para buscar paquetes en repositorios
+search_packages() {
+    # Archivo de configuración con los repositorios
+    REPOS_FILE="/home/joni/arch_2_slk/config/pkg.conf"
+
+    # Verifica que el archivo de repositorios exista
+    if [ ! -f "$REPOS_FILE" ]; then
+        echo "No se encontró el archivo $REPOS_FILE. Asegúrate de que exista en el directorio actual."
+        exit 1
+    fi
+
+    # Verifica que se proporcione un término de búsqueda
+    if [ -z "$1" ]; then
+        echo "Uso: $0 buscar <término_de_búsqueda>"
+        exit 1
+    fi
+
+    # Término de búsqueda
+    termino="$1"
+
+    # Lee los enlaces de los repositorios
+    repos=$(grep -vE '^\s*(#|$)' "$REPOS_FILE") # Ignora líneas vacías y comentarios
+
+    if [ -z "$repos" ]; then
+        echo "No se encontraron repositorios válidos en $REPOS_FILE."
+        exit 1
+    fi
+
+    # Realiza la búsqueda en los repositorios
+    echo "Buscando paquetes en los repositorios que coincidan con: '$termino'..."
+    for repo in $repos; do
+        echo "Buscando en $repo..."
+        # Descarga el índice del repositorio
+        db=$(curl -s "$repo" 2>/dev/null)
+        if [ -z "$db" ]; then
+            echo "No se pudo conectar a $repo."
+            continue
+        fi
+
+        # Extrae los nombres de los paquetes (asumiendo que están en formato .pkg.tar.zst)
+        resultados=$(echo "$db" | grep -oP 'href="\K[^"]*\.pkg\.tar\.zst' | grep -i "$termino")
+
+        if [ -n "$resultados" ]; then
+            echo "Resultados en $repo:"
+            echo "$resultados" | sed 's/^/  - /' # Formatea la salida con guiones
+        else
+            echo "No se encontraron resultados en $repo."
+        fi
+    done
+}
+
+# Función para descargar un paquete
+download_package() {
+    if [ -z "$1" ]; then
+        echo "Uso: $0 descargar <url_paquete>"
+        exit 1
+    fi
+
+    # URL del paquete
+    PACKAGE_URL="$1"
+    OUTPUT_DIR="/home/$(whoami)/descargas"
+    mkdir -p "$OUTPUT_DIR"
+
+    # Descargar el paquete
+    echo "Descargando el paquete desde: $PACKAGE_URL"
+    curl -L -o "$OUTPUT_DIR/$(basename "$PACKAGE_URL")" "$PACKAGE_URL" || {
+        echo "Error: No se pudo descargar el paquete."
+        exit 1
+    }
+
+    echo "Paquete descargado en: $OUTPUT_DIR/$(basename "$PACKAGE_URL")"
+}
+
+# Procesar comandos
+case "$1" in
+    convertir)
+        convert_package "$2"
+        ;;
+    buscar)
+        search_packages "$2"
+        ;;
+    descargar)
+        download_package "$2"
+        ;;
+    *)
+        echo "Uso: $0 <comando> [argumento]"
+        echo "Comandos disponibles:"
+        echo "  convertir <paquete.pkg.tar.zst>  - Convierte un paquete de Arch Linux a Slackware."
+        echo "  buscar <término_de_búsqueda>     - Busca paquetes en los repositorios definidos."
+        echo "  descargar <url_paquete>          - Descarga un paquete desde una URL especificada."
+        exit 1
+        ;;
+esac
