@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Verificar dependencias
+for cmd in git tar makepkg; do
+    if ! command -v $cmd &>/dev/null; then
+        echo "Error: '$cmd' no está instalado."
+        exit 1
+    fi
+done
+
+# Verificar argumentos
+if [ $# -ne 1 ]; then
+    echo "Uso: $0 <nombre_paquete_aur_o_url>"
+    exit 1
+fi
+
+# Variables
+AUR_PACKAGE="$1"
+PACKAGE_NAME=$(basename "$AUR_PACKAGE" .git)
+WORK_DIR="/tmp/$PACKAGE_NAME"
+SLACKBUILD_DIR="$PACKAGE_NAME-slackbuild"
+
+# Clonar el repositorio AUR
+echo "Clonando el repositorio AUR..."
+git clone "$AUR_PACKAGE" "$WORK_DIR" || {
+    echo "Error al clonar el repositorio."
+    exit 1
+}
+
+# Verificar existencia de PKGBUILD
+if [ ! -f "$WORK_DIR/PKGBUILD" ]; then
+    echo "Error: No se encontró el archivo PKGBUILD."
+    exit 1
+fi
+
+# Extraer información del PKGBUILD
+source <(grep -E '^pkgname=|^pkgver=|^pkgrel=' "$WORK_DIR/PKGBUILD")
+if [ -z "$pkgname" ] || [ -z "$pkgver" ] || [ -z "$pkgrel" ]; then
+    echo "Error: No se pudo extraer información del PKGBUILD."
+    exit 1
+fi
+
+# Crear estructura SlackBuild
+echo "Creando estructura SlackBuild..."
+mkdir -p "$SLACKBUILD_DIR"
+
+# Copiar fuentes
+cp -r "$WORK_DIR" "$SLACKBUILD_DIR/source"
+(cd "$SLACKBUILD_DIR/source" && tar -czf "../$pkgname-$pkgver.tar.gz" .)
+
+# Crear el archivo SlackBuild
+cat > "$SLACKBUILD_DIR/$pkgname.SlackBuild" <<EOF
+#!/bin/bash
+
+# SlackBuild para $pkgname
+PRGNAM=$pkgname
+VERSION=$pkgver
+BUILD=${pkgrel:-1}
+TAG=custom
+
+set -e
+
+# Preparar entorno
+CWD=\$(pwd)
+TMP=\${TMP:-/tmp}
+PKG=\$TMP/package-\$PRGNAM
+OUTPUT=\${OUTPUT:-/tmp}
+
+rm -rf \$PKG
+mkdir -p \$PKG \$OUTPUT
+
+# Extraer fuentes
+SOURCE_DIR=\$CWD/\$PRGNAM-\$VERSION
+tar -xf \$SOURCE_DIR.tar.gz -C \$TMP
+
+# Compilar e instalar
+cd \$TMP/\$PRGNAM-\$VERSION
+make
+make install DESTDIR=\$PKG
+
+# Crear paquete Slackware
+PACKAGE_TGZ=\$OUTPUT/\$PRGNAM-\$VERSION-\$BUILD-\$TAG.tgz
+tar -cvf \$PACKAGE_TGZ -C \$PKG .
+
+# Mover paquete al directorio del usuario
+if [ -f \$PACKAGE_TGZ ]; then
+    mv \$PACKAGE_TGZ /home/$(whoami)/
+    echo "Paquete .tgz movido a: /home/$(whoami)/"
+else
+    echo "Advertencia: No se encontró el paquete .tgz generado."
+fi
+EOF
+
+chmod +x "$SLACKBUILD_DIR/$pkgname.SlackBuild"
+
+# Mover SlackBuild al directorio del usuario
+echo "Moviendo SlackBuild al directorio del usuario..."
+mv "$SLACKBUILD_DIR" "/home/$(whoami)/"
+
+# Finalizar
+echo "SlackBuild creado en: /home/$(whoami)/$SLACKBUILD_DIR/$pkgname.SlackBuild"
+echo "Archivo fuente comprimido creado en: /home/$(whoami)/$SLACKBUILD_DIR/$pkgname-$pkgver.tar.gz"
