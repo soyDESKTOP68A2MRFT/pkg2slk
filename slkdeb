@@ -1,0 +1,139 @@
+#!/bin/bash
+
+# Verificar dependencias
+for cmd in deb2tgz curl; do
+    command -v $cmd >/dev/null 2>&1 || { echo "Error: '$cmd' no está instalado."; exit 1; }
+done
+
+# Función para convertir paquete de Debian a Slackware
+convert_deb_package() {
+    # Verificar argumentos
+    if [ -z "$1" ]; then
+        echo "Uso: $0 convertir-deb <paquete.deb>"
+        exit 1
+    fi
+
+    # Variables
+    INPUT_PACKAGE="$1"
+    PACKAGE_NAME=$(basename "$INPUT_PACKAGE" .deb)
+    WORK_DIR="/tmp/slkdeb_$PACKAGE_NAME"
+    OUTPUT_PACKAGE="$PACKAGE_NAME.txz"
+    OUTPUT_DIR="/home/$(whoami)/"
+
+    # Verificar si el archivo existe y es un paquete válido
+    if [[ ! -f "$INPUT_PACKAGE" || "${INPUT_PACKAGE##*.}" != "deb" ]]; then
+        echo "Error: El archivo especificado no es un paquete .deb válido."
+        exit 1
+    fi
+
+    # Crear directorio de trabajo
+    mkdir -p "$WORK_DIR"
+    cd "$WORK_DIR" || exit
+
+    # Convertir el paquete .deb a .txz
+    echo "Convirtiendo $INPUT_PACKAGE a $OUTPUT_PACKAGE..."
+    deb2tgz "$INPUT_PACKAGE" || {
+        echo "Error: No se pudo convertir el paquete .deb."
+        cd /
+        exit 1
+    }
+
+    # Mover el paquete a /home/joni
+    mv "$OUTPUT_PACKAGE" "$OUTPUT_DIR"
+
+    # Limpiar directorio de trabajo
+    cd /
+    rm -rf "$WORK_DIR"
+
+    echo "Conversión de .deb completada. Tu paquete está en el directorio $OUTPUT_DIR."
+    echo "Paquete: $OUTPUT_DIR$OUTPUT_PACKAGE"
+}
+
+# Función para buscar paquetes en repositorios de .deb
+search_packages_deb() {
+    REPOS_FILE="$HOME/slkdeb/config/pkg_deb.conf"
+
+    if [ ! -f "$REPOS_FILE" ]; then
+        echo "No se encontró el archivo $REPOS_FILE. Asegúrate de que exista en el directorio especificado."
+        exit 1
+    fi
+
+    if [ -z "$1" ]; then
+        echo "Uso: $0 buscar <término_de_búsqueda>"
+        exit 1
+    fi
+
+    termino="$1"
+    primera_letra=$(echo "$termino" | head -c 1)
+    repos=$(grep -vE '^\s*(#|$)' "$REPOS_FILE")
+
+    if [ -z "$repos" ]; then
+        echo "No se encontraron repositorios válidos en $REPOS_FILE."
+        exit 1
+    fi
+
+    for repo in $repos; do
+        echo "Buscando en el repositorio: $repo/$primera_letra/"
+        # Obtener los nombres de las carpetas en el subdirectorio correspondiente a la primera letra
+        subdirs=$(curl -s "$repo/$primera_letra/" | grep -Eo 'href="[^"]*/"' | cut -d'"' -f2 | sed 's|/$||')
+
+        if [ -z "$subdirs" ]; then
+            echo "No se encontraron paquetes en $repo/$primera_letra/"
+            continue
+        fi
+
+        for subdir in $subdirs; do
+            if [[ "$subdir" == *"$termino"* ]]; then
+                echo "Coincidencia encontrada: $subdir"
+                # Verificar dentro del subdirectorio del paquete
+                files=$(curl -s "$repo/$primera_letra/$subdir/" | grep -Eo 'href="[^"]*\.deb"' | cut -d'"' -f2)
+
+                for file in $files; do
+                    echo "$repo/$primera_letra/$subdir/$file"
+                done
+            fi
+        done
+    done
+}
+# Función para descargar un paquete .deb
+download_deb_package() {
+    if [ -z "$1" ]; then
+        echo "Uso: $0 descargar-deb <url_paquete>"
+        exit 1
+    fi
+
+    # URL del paquete
+    PACKAGE_URL="$1"
+    OUTPUT_DIR="/home/$(whoami)/descargas"
+    mkdir -p "$OUTPUT_DIR"
+
+    # Descargar el paquete
+    echo "Descargando el paquete desde: $PACKAGE_URL"
+    curl -L -o "$OUTPUT_DIR/$(basename "$PACKAGE_URL")" "$PACKAGE_URL" || {
+        echo "Error: No se pudo descargar el paquete."
+        exit 1
+    }
+
+    echo "Paquete descargado en: $OUTPUT_DIR/$(basename "$PACKAGE_URL")"
+}
+
+# Procesar comandos
+case "$1" in
+    convert-deb)
+        convert_deb_package "$2"
+        ;;
+    search-deb)
+        search_packages_deb "$2"
+        ;;
+    download-deb)
+        download_deb_package "$2"
+        ;;
+    *)
+        echo "Uso: $0 <comando> [argumento]"
+        echo "Comandos disponibles:"
+        echo "  convert-deb <paquete.deb>     - Convierte un paquete .deb a Slackware."
+        echo "  search-deb <término_de_búsqueda> - Busca paquetes .deb en repositorios definidos."
+        echo "  download-deb <url_paquete>     - Descarga un paquete .deb desde una URL especificada."
+        exit 1
+        ;;
+esac

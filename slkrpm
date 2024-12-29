@@ -1,0 +1,136 @@
+#!/bin/bash
+
+# Verificar dependencias
+for cmd in rpm2tgz curl; do
+    command -v $cmd >/dev/null 2>&1 || { echo "Error: '$cmd' no está instalado."; exit 1; }
+done
+
+# Función para convertir paquete de RPM a Slackware
+convert_rpm_package() {
+    # Verificar argumentos
+    if [ -z "$1" ]; then
+        echo "Uso: $0 convertir-rpm <paquete.rpm>"
+        exit 1
+    fi
+
+    # Variables
+    INPUT_PACKAGE="$1"
+    PACKAGE_NAME=$(basename "$INPUT_PACKAGE" .rpm)
+    WORK_DIR="/tmp/rpm2slk_$PACKAGE_NAME"
+    OUTPUT_PACKAGE="$PACKAGE_NAME.tgz"
+    OUTPUT_DIR="/home/$(whoami)/"
+
+    # Verificar si el archivo existe y es un paquete válido
+    if [[ ! -f "$INPUT_PACKAGE" || "${INPUT_PACKAGE##*.}" != "rpm" ]]; then
+        echo "Error: El archivo especificado no es un paquete .rpm válido."
+        exit 1
+    fi
+
+    # Crear directorio de trabajo
+    mkdir -p "$WORK_DIR"
+    cd "$WORK_DIR" || exit
+
+    # Convertir el paquete .rpm a .txz
+    echo "Convirtiendo $INPUT_PACKAGE a $OUTPUT_PACKAGE..."
+    rpm2tgz "$INPUT_PACKAGE" || {
+        echo "Error: No se pudo convertir el paquete .rpm."
+        cd /
+        exit 1
+    }
+
+    # Mover el paquete a /home/joni
+    mv "$OUTPUT_PACKAGE" "$OUTPUT_DIR"
+    echo "Conversión de .rpm completada. Tu paquete está en el directorio $OUTPUT_DIR."
+    echo "Paquete: $OUTPUT_DIR$OUTPUT_PACKAGE"
+    cd /tmp
+    rmdir rpm2slk_*
+}
+
+# Función para buscar paquetes en repositorios de .rpm
+search_rpm_packages() {
+    # Archivo de configuración con los repositorios de .rpm
+    REPOS_FILE="/home/joni/slkrpm/config/rpm_repos.conf"
+
+    # Verifica que el archivo de repositorios exista
+    if [ ! -f "$REPOS_FILE" ]; then
+        echo "No se encontró el archivo $REPOS_FILE. Asegúrate de que exista en el directorio actual."
+        exit 1
+    fi
+
+    # Verifica que se proporcione un término de búsqueda
+    if [ -z "$1" ]; then
+        echo "Uso: $0 buscar-rpm <término_de_búsqueda>"
+        exit 1
+    fi
+
+    # Término de búsqueda
+    termino="$1"
+
+    # Lee los enlaces de los repositorios
+    repos=$(grep -vE '^\s*(#|$)' "$REPOS_FILE") # Ignora líneas vacías y comentarios
+
+    if [ -z "$repos" ]; then
+        echo "No se encontraron repositorios válidos en $REPOS_FILE."
+        exit 1
+    fi
+
+    # Realiza la búsqueda en los repositorios
+    for repo in $repos; do
+        db=$(curl -s "$repo" 2>/dev/null)
+        if [ -z "$db" ]; then
+            echo "No se pudo conectar a $repo."
+            continue
+        fi
+
+        # Extrae los nombres de los paquetes .rpm
+        resultados=$(echo "$db" | grep -oP 'href="\K[^"]*\.rpm' | grep -i "$termino")
+
+        if [ -n "$resultados" ]; then
+            echo "Resultados en $repo:"
+            echo "$resultados" | sed 's/^/  - /' # Formatea la salida con guiones
+        fi
+    done
+}
+
+# Función para descargar un paquete .rpm
+download_rpm_package() {
+    if [ -z "$1" ]; then
+        echo "Uso: $0 descargar-rpm <url_paquete>"
+        exit 1
+    fi
+
+    # URL del paquete
+    PACKAGE_URL="$1"
+    OUTPUT_DIR="/home/$(whoami)/descargas"
+    mkdir -p "$OUTPUT_DIR"
+
+    # Descargar el paquete
+    echo "Descargando el paquete desde: $PACKAGE_URL"
+    curl -L -o "$OUTPUT_DIR/$(basename "$PACKAGE_URL")" "$PACKAGE_URL" || {
+        echo "Error: No se pudo descargar el paquete."
+        exit 1
+    }
+
+    echo "Paquete descargado en: $OUTPUT_DIR/$(basename "$PACKAGE_URL")"
+}
+
+# Procesar comandos
+case "$1" in
+    convert-rpm)
+        convert_rpm_package "$2"
+        ;;
+    search-rpm)
+        search_rpm_packages "$2"
+        ;;
+    download-rpm)
+        download_rpm_package "$2"
+        ;;
+    *)
+        echo "Uso: $0 <comando> [argumento]"
+        echo "Comandos disponibles:"
+        echo "  convert-rpm <paquete.rpm>     - Convierte un paquete .rpm a Slackware."
+        echo "  search-rpm <término_de_búsqueda> - Busca paquetes .rpm en repositorios definidos."
+        echo "  download-rpm <url_paquete>     - Descarga un paquete .rpm desde una URL especificada."
+        exit 1
+        ;;
+esac
