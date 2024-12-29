@@ -1,2 +1,2 @@
 # pkg2slk
-A utility to convert arch linux packages to slackware packages
+utilities to convert arch/debian/fedora-RHEL packages to slackware packages
