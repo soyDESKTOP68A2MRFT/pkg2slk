@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Archivo de configuración con los repositorios de Alpine
+ALPINE_REPOS_CONF="/home/joni/slktools/alpslk/config/alpine-repos.conf"
+PACKAGE_NAME="$1"  # El nombre del paquete a buscar
+
+# Verificar si el archivo de configuración existe
+if [[ ! -f "$ALPINE_REPOS_CONF" ]]; then
+    echo "El archivo de configuración '$ALPINE_REPOS_CONF' no existe."
+    exit 1
+fi
+
+# Verificar si el paquete de búsqueda fue proporcionado
+if [[ -z "$PACKAGE_NAME" ]]; then
+    echo "Por favor, ingrese el nombre del paquete a buscar."
+    exit 1
+fi
+
+# Leer los repositorios de Alpine desde el archivo de configuración
+for REPO in $(cat "$ALPINE_REPOS_CONF"); do
+    echo "Buscando en: $REPO"
+    curl -s "$REPO" | grep -E "\.apk" | grep "$PACKAGE_NAME" | sed -n 's/.*href="\([^"]*\).*/\1/p'
+done

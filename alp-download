@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Directorio donde se guardará el paquete descargado
+ALPINE_PACKAGE_DIR="/home/joni/descargas"
+
+
+# Argumento: URL del paquete de Alpine
+ALPINE_PACKAGE_URL="$1"
+
+# Verificar que la URL sea válida
+if [[ -z "$ALPINE_PACKAGE_URL" || ! "$ALPINE_PACKAGE_URL" =~ ^http ]]; then
+    echo "Por favor, proporciona una URL válida del paquete."
+    exit 1
+fi
+
+# Extraer el nombre del paquete de la URL
+ALPINE_PACKAGE=$(basename "$ALPINE_PACKAGE_URL")
+
+# Descargar el paquete a la carpeta de descargas
+curl -L -o "$ALPINE_PACKAGE_DIR/$ALPINE_PACKAGE" "$ALPINE_PACKAGE_URL"
+
+echo "Paquete Alpine descargado a: $ALPINE_PACKAGE_DIR/$ALPINE_PACKAGE"

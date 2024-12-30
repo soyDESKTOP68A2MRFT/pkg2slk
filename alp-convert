@@ -1,0 +1,38 @@
+#!/bin/bash
+
+ALPINE_PACKAGE_DIR="/home/joni/descargas"  # Ruta donde están los paquetes Alpine descargados
+ALPINE_PACKAGE="$1"    # El paquete de Alpine ya descargado
+PACKAGE_NAME="${ALPINE_PACKAGE%.apk}"  # Nombre del paquete sin la extensión .apk
+PACKAGE_DIR="/tmp/$PACKAGE_NAME"  # Directorio para extraer el paquete
+SLACKWARE_REPO_PATH="/home/joni"  # Directorio donde se guardará el paquete Slackware
+
+# Crear directorios si no existen
+mkdir -p "$SLACKWARE_REPO_PATH"
+mkdir -p "$PACKAGE_DIR"
+
+# Verificar que el paquete Alpine existe en la ruta especificada
+if [[ ! -f "$ALPINE_PACKAGE_DIR/$ALPINE_PACKAGE" ]]; then
+    echo "El paquete no se encuentra en la ruta especificada: $ALPINE_PACKAGE_DIR"
+    exit 1
+fi
+
+# Extraer el paquete
+tar -xvf "$ALPINE_PACKAGE_DIR/$ALPINE_PACKAGE" -C "$PACKAGE_DIR"
+
+# Cambiar al directorio del paquete
+cd "$PACKAGE_DIR" || exit
+
+# Crear el paquete Slackware usando makepkg
+makepkg -l y -c n  "$SLACKWARE_REPO_PATH/${PACKAGE_NAME}-slackware.tgz" 
+
+# Verificar si la compilación fue exitosa
+if [ $? -eq 0 ]; then
+    # Borrar temporalmente si la compilación fue exitosa
+    rm -rf "/tmp/$PACKAGE_NAME"
+echo "Paquete convertido: $SLACKWARE_REPO_PATH/${PACKAGE_NAME}-slackware.tgz"
+else
+    echo "La compilación no fue exitosa, no se eliminarán los archivos temporales."
+fi
+
+
+
