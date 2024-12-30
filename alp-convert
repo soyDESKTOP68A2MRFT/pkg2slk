@@ -1,10 +1,10 @@
 #!/bin/bash
 
-ALPINE_PACKAGE_DIR="/home/joni/descargas"  # Ruta donde están los paquetes Alpine descargados
+ALPINE_PACKAGE_DIR="/home/$(whoami)/descargas"  # Ruta donde están los paquetes Alpine descargados
 ALPINE_PACKAGE="$1"    # El paquete de Alpine ya descargado
 PACKAGE_NAME="${ALPINE_PACKAGE%.apk}"  # Nombre del paquete sin la extensión .apk
 PACKAGE_DIR="/tmp/$PACKAGE_NAME"  # Directorio para extraer el paquete
-SLACKWARE_REPO_PATH="/home/joni"  # Directorio donde se guardará el paquete Slackware
+SLACKWARE_REPO_PATH="/home/$(whoami)"  # Directorio donde se guardará el paquete Slackware
 
 # Crear directorios si no existen
 mkdir -p "$SLACKWARE_REPO_PATH"
