@@ -1,0 +1,131 @@
+#!/bin/bash
+
+# Función para mostrar ayuda
+show_help() {
+    echo "Uso: $0 --<argumento> [sub-argumento]"
+    echo "Opciones:"
+    echo "  --slkdeb       Ejecuta el script slkdeb"
+    echo "    search-deb   Ejecuta 'slkdeb search-deb <término>'"
+    echo "    download-deb Ejecuta 'slkdeb download-deb'"
+    echo "    convert-deb  Ejecuta 'slkdeb convert-deb'"
+    echo "  --slkrpm       Ejecuta el script slkrpm"
+    echo "    search-rpm   Ejecuta 'slkrpm search-rpm <término>'"
+    echo "    download-rpm Ejecuta 'slkrpm download-rpm'"
+    echo "    convert-rpm  Ejecuta 'slkrpm convert-rpm'"
+    echo "  --archslk      Ejecuta el script archslk"
+    echo "    search       Ejecuta 'archslk search <término>'"
+    echo "    download     Ejecuta 'archslk download'"
+    echo "    convert      Ejecuta 'archslk convert'"
+    echo "  --alp-search   Ejecuta el script alp-search <término>"
+    echo "  --alp-download Ejecuta el script alp-download"
+    echo "  --alp-convert  Ejecuta el script alp-convert"
+}
+
+# Verificar si se proporcionaron argumentos
+if [ "$#" -lt 1 ]; then
+    show_help
+    exit 1
+fi
+
+# Procesar el argumento principal
+case "$1" in
+    --slkdeb)
+        echo "Argumentos recibidos: $1 $2 $3 $4"
+        case "$2" in
+            search-deb)
+                if [ -z "$3" ]; then
+                    echo "Error: Falta el término para la búsqueda de deb"
+                    exit 1
+                fi
+                echo "Ejecutando slkdeb search-deb con término: $3"
+                slkdeb search-deb "$3"
+                ;;
+            download-deb)
+                echo "Ejecutando slkdeb download-deb"
+                slkdeb download-deb "$3"
+                ;;
+            convert-deb)
+                echo "Ejecutando slkdeb convert-deb"
+                slkdeb convert-deb "$3"
+                ;;
+            *)
+                echo "Error: Argumento no válido para slkdeb"
+                show_help
+                exit 1
+                ;;
+        esac
+        ;;
+    --slkrpm)
+        echo "Argumentos recibidos: $1 $2 $3 $4"
+        case "$2" in
+            search-rpm)
+                if [ -z "$3" ]; then
+                    echo "Error: Falta el término para la búsqueda de rpm"
+                    exit 1
+                fi
+                echo "Ejecutando slkrpm search-rpm con término: $3"
+                slkrpm search-rpm "$3"
+                ;;
+            download-rpm)
+                echo "Ejecutando slkrpm download-rpm"
+                slkrpm download-rpm "$3"
+                ;;
+            convert-rpm)
+                echo "Ejecutando slkrpm convert-rpm"
+                slkrpm convert-rpm "$3"
+                ;;
+            *)
+                echo "Error: Argumento no válido para slkrpm"
+                show_help
+                exit 1
+                ;;
+        esac
+        ;;
+    --archslk)
+        echo "Argumentos recibidos: $1 $2 $3 $4"
+        case "$2" in
+            search)
+                if [ -z "$3" ]; then
+                    echo "Error: Falta el término para la búsqueda de archslk"
+                    exit 1
+                fi
+                echo "Ejecutando archslk search con término: $3"
+                archslk search "$3"
+                ;;
+            download)
+                echo "Ejecutando archslk download"
+                archslk download "$3"
+                ;;
+            convert)
+                echo "Ejecutando archslk convert"
+                archslk convert "$3"
+                ;;
+            *)
+                echo "Error: Argumento no válido para archslk"
+                show_help
+                exit 1
+                ;;
+        esac
+        ;;
+    --alp-search)
+        if [ -z "$2" ]; then
+            echo "Error: Falta el término para la búsqueda de alp-search"
+            exit 1
+        fi
+        echo "Ejecutando alp-search con término: $2"
+        alp-search "$2"
+        ;;
+    --alp-download)
+        echo "Ejecutando alp-download"
+        alp-download "$2"
+        ;;
+    --alp-convert)
+        echo "Ejecutando alp-convert"
+        alp-convert "$2"
+        ;;
+    *)
+        echo "Error: Argumento no válido"
+        show_help
+        exit 1
+        ;;
+esac
