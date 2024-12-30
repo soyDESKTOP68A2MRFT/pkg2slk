@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Directorio donde se guardará el paquete descargado
-ALPINE_PACKAGE_DIR="/home/joni/descargas"
+ALPINE_PACKAGE_DIR="/home/$(whoami)/descargas"
 
 
 # Argumento: URL del paquete de Alpine
