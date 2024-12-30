@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Archivo de configuración con los repositorios de Alpine
-ALPINE_REPOS_CONF="/home/joni/slktools/alpslk/config/alpine-repos.conf"
+ALPINE_REPOS_CONF="/home/$(whoami)/slktools/alpslk/config/alpine-repos.conf"
 PACKAGE_NAME="$1"  # El nombre del paquete a buscar
 
 # Verificar si el archivo de configuración existe
